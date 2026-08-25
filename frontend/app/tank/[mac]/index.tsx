@@ -9,7 +9,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTankStore } from '@/src/store/tankStore';
-import { batteryPercentFromMv, rgbHex, textColorFor } from '@/src/ble/protocol';
+import { batteryPercentFromMv, rgbHex } from '@/src/ble/protocol';
 import { TM_FLAG_LOW_BATT, TM_FLAG_CAL_VALID, TM_FLAG_ON_BATTERY } from '@/src/types';
 
 export default function TankDetailScreen() {
@@ -33,7 +33,6 @@ export default function TankDetailScreen() {
   }
 
   const color = rgbHex(tank.colorRGB);
-  const accentText = textColorFor(tank.colorRGB);
   const label = tank.name ? tank.name : `Unnamed ${tank.mac.slice(-8)}`;
   const battPct = batteryPercentFromMv(tank.batteryMv);
   const level = Math.max(0, Math.min(100, tank.levelPercent));
@@ -112,15 +111,6 @@ export default function TankDetailScreen() {
           <MetaRow k="Raw ADC" v={tank.diag ? `${tank.diag.rawAdc} (filt ${tank.diag.filteredAdc})` : '—'} />
         </View>
       </ScrollView>
-
-      <Pressable
-        testID="edit-color-fab"
-        onPress={() => router.push(`/tank/${encodeURIComponent(tank.mac)}/settings`)}
-        style={[styles.fab, { backgroundColor: color, bottom: insets.bottom + 20 }]}
-      >
-        <Ionicons name="create-outline" size={22} color={accentText} />
-        <Text style={[styles.fabText, { color: accentText }]}>Edit sensor</Text>
-      </Pressable>
     </View>
   );
 }

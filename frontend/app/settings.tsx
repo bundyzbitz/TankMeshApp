@@ -59,7 +59,8 @@ export default function SettingsScreen() {
           </View>
 
           <Section title="This display">
-            <Field label="Group label" hint="Only sensors with a matching group label appear on the overview.">
+            <View style={styles.stackedField}>
+              <Text style={styles.stackedLabel}>Group label</Text>
               <View style={styles.rowInput}>
                 <TextInput
                   testID="group-input"
@@ -68,6 +69,8 @@ export default function SettingsScreen() {
                   onBlur={saveGroup}
                   style={styles.input}
                   maxLength={15}
+                  placeholder="TankMesh"
+                  placeholderTextColor="#4A4A55"
                 />
                 <Pressable
                   testID="save-group-button"
@@ -77,7 +80,10 @@ export default function SettingsScreen() {
                   <Text style={styles.saveInlineText}>Save</Text>
                 </Pressable>
               </View>
-            </Field>
+              <Text style={styles.stackedHint}>
+                Only sensors with a matching group label appear on the overview.
+              </Text>
+            </View>
 
             <Field label="Demo mode" hint="Simulate 4 tanks for UI preview. Turn off to use real BLE (APK build only).">
               <Switch
@@ -238,9 +244,26 @@ const styles = StyleSheet.create({
     borderColor: '#2A2A38',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    fontSize: 15,
+  },
+  stackedField: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1A2A',
+  },
+  stackedLabel: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  stackedHint: {
+    color: '#4A4A55',
+    fontSize: 11,
+    marginTop: 8,
+    lineHeight: 16,
   },
   saveInlineBtn: {
     paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#2AB7FF', borderRadius: 8,
