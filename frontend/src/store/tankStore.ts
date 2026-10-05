@@ -89,6 +89,15 @@ class TankStore {
         rssi: e.rssi,
         displayOrder,
         calMeshKnown: false,
+        // v2 adverts carry raw/filtered ADC inline — seed the diag block
+        // so the detail screen can show them before the GATT pull lands.
+        diag: e.adv.rawAdc != null && e.adv.filteredAdc != null ? {
+          rawAdc: e.adv.rawAdc,
+          filteredAdc: e.adv.filteredAdc,
+          isCalibrated: false,
+          settingsVersion: e.adv.settingsVersion,
+          batteryMillivolts: e.adv.batteryMv,
+        } : undefined,
       };
       list.push(fresh);
       idx = list.length - 1;
@@ -98,6 +107,25 @@ class TankStore {
       return;
     }
     const cur = list[idx];
+    // v2 adverts carry raw/filtered ADC inline — merge them into the
+    // existing diag block on every advert so the Raw ADC readout stays
+    // live without needing a GATT pull. v1 adverts omit these fields,
+    // so cur.diag (populated by the Diag characteristic read) is left
+    // untouched for v1 sensors.
+    const diag =
+      e.adv.rawAdc != null && e.adv.filteredAdc != null
+        ? {
+            ...(cur.diag ?? {
+              isCalibrated: false,
+              settingsVersion: e.adv.settingsVersion,
+              batteryMillivolts: e.adv.batteryMv,
+            }),
+            rawAdc: e.adv.rawAdc,
+            filteredAdc: e.adv.filteredAdc,
+            batteryMillivolts: e.adv.batteryMv,
+            settingsVersion: e.adv.settingsVersion,
+          }
+        : cur.diag;
     const next: Tank = {
       ...cur,
       levelPercent: e.adv.levelPercent,
@@ -107,6 +135,7 @@ class TankStore {
       flags: e.adv.flags,
       lastSeenMs: Date.now(),
       rssi: e.rssi,
+      diag,
     };
     list[idx] = next;
     this.set({ tanks: list });
