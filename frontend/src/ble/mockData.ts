@@ -44,10 +44,12 @@ export function makeMockTanks(): Tank[] {
     history: seedHistory(level - drift, drift),
   });
   return [
-    mk(0, 'Fresh Water', 0x2AB7FF, 78,  4050, -4, 20, null),   // alert if drops below 20
-    mk(1, 'Grey Water',  0x8E8E93, 42,  3980, +6, null, 80),   // alert if rises above 80
-    mk(2, 'Black Water', 0x6B4E2E, 15,  3720, +2, null, 10),   // starts in alarm (15 > 10)
-    mk(3, 'Diesel',      0xF0B429, 63,  4110, -1, 15, null),
+    mk(0, 'Fresh Water', 0x2AB7FF, 78,  4050, -4, 20, null, 'Boat'),
+    mk(1, 'Grey Water',  0x8E8E93, 42,  3980, +6, null, 80, 'Boat'),
+    mk(2, 'Black Water', 0x6B4E2E, 15,  3720, +2, null, 10, 'Boat'),   // starts in alarm
+    mk(3, 'Diesel',      0xF0B429, 63,  4110, -1, 15, null, 'Boat'),
+    mk(4, 'RV Fresh',    0x00C48C, 55,  4020, -2, 25, null, 'RV'),
+    mk(5, 'RV Grey',     0xC26EFF, 30,  3900, +3, null, 85, 'RV'),
   ];
 }
 

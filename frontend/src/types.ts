@@ -62,8 +62,15 @@ export const TANKMESH_MESH_UUID      = '8f9e1a03-4b2e-4f1a-9c3d-0123456789ab';
 export const TANKMESH_DIAG_UUID      = '8f9e1a04-4b2e-4f1a-9c3d-0123456789ab';
 
 export type AppSettings = {
-  screenGroupLabel: string;
+  // Legacy single-group label; kept for backward compat during migration.
+  screenGroupLabel?: string;
+  // Group labels this phone is monitoring. A tank shows on the overview
+  // iff its mesh.prefix is in this list. Supports monitoring multiple
+  // installs (e.g. Boat + RV) from one phone without re-labeling sensors.
+  visibleGroups: string[];
   demoMode: boolean;
   viewMode: 'list' | 'grid';
   alertsEnabled: boolean;
+  notificationsEnabled: boolean;   // whether the user wants lock-screen notifications
+  notificationsPermitted: boolean; // whether the OS has granted permission
 };

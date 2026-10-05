@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTankStore, tankStore, selectAllTanks } from '@/src/store/tankStore';
+import { useTankStore, tankStore, selectAllTanks, selectKnownGroups } from '@/src/store/tankStore';
 import { rgbHex, batteryPercentFromMv } from '@/src/ble/protocol';
 
 export default function SettingsScreen() {
@@ -19,11 +19,16 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [group, setGroup] = useState(state.settings.screenGroupLabel);
+  const [newGroup, setNewGroup] = useState('');
   const allTanks = selectAllTanks(state);
+  const knownGroups = selectKnownGroups(state);
+  const visibleGroups = state.settings.visibleGroups;
 
-  const saveGroup = () => {
-    tankStore.setScreenGroupLabel(group.trim() || 'TankMesh');
+  const addGroup = () => {
+    const g = newGroup.trim();
+    if (!g) return;
+    tankStore.addGroup(g);
+    setNewGroup('');
   };
 
   const statusLine =
@@ -58,32 +63,86 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <Section title="This display">
+          <Section title="Groups">
             <View style={styles.stackedField}>
-              <Text style={styles.stackedLabel}>Group label</Text>
+              <Text style={styles.stackedLabel}>Visible groups</Text>
+              <Text style={styles.stackedHint}>
+                Tap to toggle. Only sensors whose group label is highlighted appear on the overview. Monitor multiple installs (e.g. Boat + RV) from one phone.
+              </Text>
+              <View style={styles.groupChipRow}>
+                {knownGroups.length === 0 && (
+                  <Text style={styles.chipEmpty}>No groups yet — add one below.</Text>
+                )}
+                {knownGroups.map((g) => {
+                  const active = visibleGroups.includes(g);
+                  const count = state.tanks.filter((t) => t.mesh?.prefix === g).length;
+                  return (
+                    <Pressable
+                      key={g}
+                      testID={`group-chip-${g}`}
+                      onPress={() => tankStore.toggleGroupVisibility(g)}
+                      style={[
+                        styles.groupChip,
+                        active ? styles.groupChipActive : styles.groupChipInactive,
+                      ]}
+                    >
+                      {active && (
+                        <Ionicons name="checkmark" size={13} color="#0A0A14" />
+                      )}
+                      <Text style={active ? styles.groupChipTextActive : styles.groupChipTextInactive}>
+                        {g}
+                      </Text>
+                      {count > 0 && (
+                        <View style={active ? styles.groupBadgeActive : styles.groupBadgeInactive}>
+                          <Text style={active ? styles.groupBadgeTextActive : styles.groupBadgeTextInactive}>
+                            {count}
+                          </Text>
+                        </View>
+                      )}
+                      {active && visibleGroups.length > 1 && (
+                        <Pressable
+                          onPress={(e) => { e.stopPropagation(); tankStore.removeGroup(g); }}
+                          hitSlop={6}
+                          style={{ marginLeft: 2 }}
+                        >
+                          <Ionicons name="close-circle" size={14} color="rgba(10,10,20,0.5)" />
+                        </Pressable>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.stackedField}>
+              <Text style={styles.stackedLabel}>Add a group</Text>
               <View style={styles.rowInput}>
                 <TextInput
-                  testID="group-input"
-                  value={group}
-                  onChangeText={(v) => setGroup(v.slice(0, 15))}
-                  onBlur={saveGroup}
+                  testID="new-group-input"
+                  value={newGroup}
+                  onChangeText={(v) => setNewGroup(v.slice(0, 15))}
+                  onSubmitEditing={addGroup}
+                  placeholder="e.g. Workshop"
+                  placeholderTextColor="#4A4A55"
                   style={styles.input}
                   maxLength={15}
-                  placeholder="TankMesh"
-                  placeholderTextColor="#4A4A55"
+                  returnKeyType="done"
                 />
                 <Pressable
-                  testID="save-group-button"
-                  onPress={saveGroup}
+                  testID="add-group-button"
+                  onPress={addGroup}
                   style={styles.saveInlineBtn}
                 >
-                  <Text style={styles.saveInlineText}>Save</Text>
+                  <Text style={styles.saveInlineText}>Add</Text>
                 </Pressable>
               </View>
               <Text style={styles.stackedHint}>
-                Only sensors with a matching group label appear on the overview.
+                You can also create a group by assigning it to any sensor on its edit page — new groups appear here automatically.
               </Text>
             </View>
+          </Section>
+
+          <Section title="This display">
 
             <Field label="Demo mode" hint="Simulate 4 tanks for UI preview. Turn off to use real BLE (APK build only).">
               <Switch
@@ -100,6 +159,25 @@ export default function SettingsScreen() {
                 testID="alerts-switch"
                 value={state.settings.alertsEnabled}
                 onValueChange={(v) => tankStore.setAlertsEnabled(v)}
+                trackColor={{ true: '#FF5A5F', false: '#2A2A38' }}
+                thumbColor="#FFFFFF"
+              />
+            </Field>
+
+            <Field
+              label="Lock-screen alerts"
+              hint={
+                state.settings.notificationsEnabled && state.settings.notificationsPermitted
+                  ? 'Also push a notification to the lock screen when a tank trips.'
+                  : state.settings.notificationsEnabled && !state.settings.notificationsPermitted
+                    ? 'Permission denied — enable notifications for this app in your phone\'s Settings, then toggle back on.'
+                    : 'Push a notification to the lock screen when a tank trips.'
+              }
+            >
+              <Switch
+                testID="notifications-switch"
+                value={state.settings.notificationsEnabled && state.settings.notificationsPermitted}
+                onValueChange={(v) => tankStore.setNotificationsEnabled(v)}
                 trackColor={{ true: '#FF5A5F', false: '#2A2A38' }}
                 thumbColor="#FFFFFF"
               />
@@ -122,7 +200,7 @@ export default function SettingsScreen() {
             {allTanks.map((t) => {
               const color = rgbHex(t.colorRGB);
               const pct = batteryPercentFromMv(t.batteryMv);
-              const inGroup = t.mesh?.prefix === state.settings.screenGroupLabel;
+              const inGroup = t.mesh?.prefix ? state.settings.visibleGroups.includes(t.mesh.prefix) : false;
               return (
                 <Pressable
                   key={t.mac}
@@ -258,6 +336,45 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
   },
+
+  groupChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  chipEmpty: { color: '#4A4A55', fontSize: 12 },
+  groupChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  groupChipActive: {
+    backgroundColor: '#2AB7FF',
+    borderColor: '#2AB7FF',
+  },
+  groupChipInactive: {
+    backgroundColor: '#1A1A2A',
+    borderColor: '#2A2A38',
+  },
+  groupChipTextActive: { color: '#0A0A14', fontSize: 13, fontWeight: '700' },
+  groupChipTextInactive: { color: '#8E8E93', fontSize: 13, fontWeight: '600' },
+  groupBadgeActive: {
+    backgroundColor: 'rgba(10,10,20,0.25)',
+    minWidth: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+  },
+  groupBadgeInactive: {
+    backgroundColor: '#2A2A38',
+    minWidth: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+  },
+  groupBadgeTextActive: { color: '#0A0A14', fontSize: 10, fontWeight: '800' },
+  groupBadgeTextInactive: { color: '#8E8E93', fontSize: 10, fontWeight: '700' },
   stackedField: {
     paddingVertical: 14,
     borderBottomWidth: 1,

@@ -16,6 +16,12 @@ import {
   setThresholds,
 } from './persist';
 import { AppSettings, Tank, MAX_TANKS, TankCal, TankMesh } from '../types';
+import {
+  requestNotificationPermission,
+  fireTankAlert,
+  notificationsSupported,
+  ensureNotificationChannel,
+} from '../notifications/local';
 
 type State = {
   tanks: Tank[];
@@ -63,6 +69,13 @@ class TankStore {
       this.startDemo();
     } else {
       await this.ble.startScan();
+    }
+
+    // Register Android notification channel so the OS permission prompt
+    // can appear on first threshold crossing. Do NOT request permission
+    // here — ask contextually when the user turns on notifications.
+    if (notificationsSupported()) {
+      await ensureNotificationChannel();
     }
   }
 
@@ -153,11 +166,22 @@ class TankStore {
     // Threshold edge detection — fire haptic only on *crossing* so a tank
     // that stays below min doesn't keep buzzing every advert.
     this.checkThresholdCrossing(cur, next);
+    // Auto-discover new groups so freshly-powered-on sensors show up on
+    // the overview without the user having to open Settings and add them.
+    this.autoAddGroup(next);
     // If sensor bumped its settings version, re-pull
     if (next.advSettingsVersion !== next.cachedSettingsVersion) {
       this.pullSettings(next.mac);
     }
   };
+
+  private autoAddGroup(tank: Tank) {
+    const g = tank.mesh?.prefix;
+    if (!g) return;
+    if (this.state.settings.visibleGroups.includes(g)) return;
+    // Don't await — fire-and-forget persistence
+    this.setVisibleGroups([...this.state.settings.visibleGroups, g]);
+  }
 
   private alertState = new Map<string, 'ok' | 'below' | 'above'>();
 
@@ -174,19 +198,31 @@ class TankStore {
     // Only buzz on a transition into an alarm state (ok -> below/above),
     // not on continued alarm or recovery.
     if (now !== 'ok' && was !== now) {
-      this.fireAlert();
+      this.fireAlert(next, now);
     }
   }
 
-  private fireAlert() {
-    if (Platform.OS === 'web') return;
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      // Two short follow-up pulses so it reads as "attention" not just a tap.
-      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 220);
-      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 440);
-    } catch {
-      /* haptics not available on this device - ignore */
+  private fireAlert(tank: Tank, kind: 'below' | 'above') {
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 220);
+        setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 440);
+      } catch {
+        /* haptics not available on this device - ignore */
+      }
+    }
+    // Lock-screen notification — only if the user has enabled them and the
+    // OS has granted permission. Falls through silently otherwise.
+    const s = this.state.settings;
+    if (s.notificationsEnabled && s.notificationsPermitted) {
+      const name = tank.name || `Tank ${tank.mac.slice(-5)}`;
+      const title = kind === 'below' ? `${name} is low` : `${name} is high`;
+      const body =
+        kind === 'below'
+          ? `Level ${tank.levelPercent}% dropped below your ${tank.minThreshold}% alert threshold.`
+          : `Level ${tank.levelPercent}% rose above your ${tank.maxThreshold}% alert threshold.`;
+      fireTankAlert(title, body);
     }
   }
 
@@ -208,6 +244,10 @@ class TankStore {
         calMeshKnown: !!(r.cal && r.mesh) || t.calMeshKnown,
         cachedSettingsVersion: r.diag?.settingsVersion ?? t.cachedSettingsVersion,
       }));
+      // Mesh prefix is only known after the first successful GATT read on a
+      // real BLE sensor — auto-add it here too.
+      const after = this.state.tanks.find((t) => t.mac === mac);
+      if (after) this.autoAddGroup(after);
     } catch (err: any) {
       // silent — will retry next adv
       console.log('pullSettings error', mac, err?.message);
@@ -247,10 +287,56 @@ class TankStore {
     this.set({ settings: s });
   }
 
-  async setScreenGroupLabel(group: string) {
-    const s = { ...this.state.settings, screenGroupLabel: group || 'TankMesh' };
-    await saveSettings(s);
+  async setScreenGroupLabel(_group: string) {
+    // Deprecated — group filtering now uses visibleGroups. Kept as a no-op
+    // so any lingering caller doesn't crash.
+  }
+
+  async setVisibleGroups(groups: string[]) {
+    const dedup = Array.from(new Set(groups.map((g) => g.trim()).filter(Boolean)));
+    const s = { ...this.state.settings, visibleGroups: dedup.length ? dedup : ['TankMesh'] };
+    // Update state synchronously first so queued autoAddGroup calls read
+    // the up-to-date list instead of racing with the AsyncStorage write.
     this.set({ settings: s });
+    saveSettings(s).catch(() => { /* best effort */ });
+  }
+
+  async toggleGroupVisibility(group: string) {
+    const g = group.trim();
+    if (!g) return;
+    const cur = this.state.settings.visibleGroups;
+    const next = cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g];
+    await this.setVisibleGroups(next);
+  }
+
+  async addGroup(group: string) {
+    const g = group.trim();
+    if (!g) return;
+    if (this.state.settings.visibleGroups.includes(g)) return;
+    await this.setVisibleGroups([...this.state.settings.visibleGroups, g]);
+  }
+
+  async removeGroup(group: string) {
+    const g = group.trim();
+    const next = this.state.settings.visibleGroups.filter((x) => x !== g);
+    await this.setVisibleGroups(next);
+  }
+
+  async setNotificationsEnabled(enabled: boolean) {
+    if (enabled) {
+      const granted = await requestNotificationPermission();
+      const s = {
+        ...this.state.settings,
+        notificationsEnabled: granted,
+        notificationsPermitted: granted,
+      };
+      await saveSettings(s);
+      this.set({ settings: s });
+    } else {
+      const s = { ...this.state.settings, notificationsEnabled: false };
+      await saveSettings(s);
+      this.set({ settings: s });
+    }
   }
 
   async setDemoMode(demo: boolean) {
@@ -308,7 +394,11 @@ class TankStore {
 
   // ---------- Demo mode ----------
   private startDemo() {
-    this.set({ tanks: makeMockTanks(), bleStatus: 'idle' });
+    const tanks = makeMockTanks();
+    this.set({ tanks, bleStatus: 'idle' });
+    // Auto-add every demo tank's group so the overview isn't empty on
+    // first run with demoMode on.
+    tanks.forEach((t) => this.autoAddGroup(t));
     if (this.demoTimer) clearInterval(this.demoTimer);
     this.demoTimer = setInterval(() => {
       this.set({ tanks: tickMockTanks(this.state.tanks) });
@@ -327,11 +417,21 @@ export function useTankStore(): State {
 
 // derived helpers
 export function selectMatchingTanks(state: State): Tank[] {
-  const g = state.settings.screenGroupLabel;
-  const filtered = state.tanks.filter((t) => !!t.mesh && t.mesh.prefix === g);
+  const groups = state.settings.visibleGroups;
+  const filtered = state.tanks.filter((t) => !!t.mesh && groups.includes(t.mesh.prefix));
   return filtered.sort((a, b) => (a.displayOrder - b.displayOrder));
 }
 
 export function selectAllTanks(state: State): Tank[] {
   return state.tanks.slice().sort((a, b) => a.displayOrder - b.displayOrder);
+}
+
+// Every distinct group label this phone has heard from a sensor, union'd
+// with the user-added groups — drives the group chip row in Settings.
+export function selectKnownGroups(state: State): string[] {
+  const set = new Set<string>(state.settings.visibleGroups);
+  for (const t of state.tanks) {
+    if (t.mesh?.prefix) set.add(t.mesh.prefix);
+  }
+  return Array.from(set).sort();
 }

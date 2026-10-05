@@ -53,7 +53,11 @@ export default function OverviewScreen() {
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title} testID="overview-title">
-            {state.settings.screenGroupLabel}
+            {state.settings.visibleGroups.length === 1
+              ? state.settings.visibleGroups[0]
+              : state.settings.visibleGroups.length === 0
+                ? 'No group selected'
+                : `${state.settings.visibleGroups.length} groups`}
           </Text>
           <View style={styles.statusRow}>
             <View style={[styles.dot, { backgroundColor: bleDotColor }]} />
