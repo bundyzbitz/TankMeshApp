@@ -16,6 +16,8 @@ export type Tank = {
   lastSeenMs: number;
   rssi: number | null;
   displayOrder: number;       // 0..255, 255 = unset
+  minThreshold: number | null;  // alert when level drops below (0-100), null = disabled
+  maxThreshold: number | null;  // alert when level rises above (0-100), null = disabled
   // Cached GATT fields (fetched over connection)
   cal?: TankCal;
   mesh?: TankMesh;
@@ -62,4 +64,6 @@ export const TANKMESH_DIAG_UUID      = '8f9e1a04-4b2e-4f1a-9c3d-0123456789ab';
 export type AppSettings = {
   screenGroupLabel: string;
   demoMode: boolean;
+  viewMode: 'list' | 'grid';
+  alertsEnabled: boolean;
 };

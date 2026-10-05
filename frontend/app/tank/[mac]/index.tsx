@@ -3,11 +3,10 @@
 // drawTankDetail() screen with a settings button in the corner.
 
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useWindowDimensions } from 'react-native';
 
 import { useTankStore } from '@/src/store/tankStore';
 import { batteryPercentFromMv, rgbHex } from '@/src/ble/protocol';

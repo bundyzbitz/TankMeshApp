@@ -16,7 +16,13 @@ export function makeMockTanks(): Tank[] {
     }
     return samples;
   };
-  const mk = (i: number, name: string, color: number, level: number, mv: number, drift: number, group = 'TankMesh'): Tank => ({
+  const mk = (
+    i: number, name: string, color: number, level: number, mv: number,
+    drift: number,
+    minThreshold: number | null = null,
+    maxThreshold: number | null = null,
+    group = 'TankMesh',
+  ): Tank => ({
     mac: `DE:MO:${i.toString(16).padStart(2, '0').toUpperCase()}:00:00:0${i}`,
     name,
     colorRGB: color,
@@ -29,6 +35,8 @@ export function makeMockTanks(): Tank[] {
     lastSeenMs: now,
     rssi: -55 - i * 3,
     displayOrder: i,
+    minThreshold,
+    maxThreshold,
     calMeshKnown: true,
     cal: { autoCalEnabled: true, adcMin: 300, adcMax: 3800 },
     mesh: { prefix: group, sleepIntervalSec: 60 },
@@ -36,10 +44,10 @@ export function makeMockTanks(): Tank[] {
     history: seedHistory(level - drift, drift),
   });
   return [
-    mk(0, 'Fresh Water', 0x2AB7FF, 78,  4050, -4),  // slowly draining
-    mk(1, 'Grey Water',  0x8E8E93, 42,  3980, +6),  // filling
-    mk(2, 'Black Water', 0x6B4E2E, 15,  3720, +2),
-    mk(3, 'Diesel',      0xF0B429, 63,  4110, -1),
+    mk(0, 'Fresh Water', 0x2AB7FF, 78,  4050, -4, 20, null),   // alert if drops below 20
+    mk(1, 'Grey Water',  0x8E8E93, 42,  3980, +6, null, 80),   // alert if rises above 80
+    mk(2, 'Black Water', 0x6B4E2E, 15,  3720, +2, null, 10),   // starts in alarm (15 > 10)
+    mk(3, 'Diesel',      0xF0B429, 63,  4110, -1, 15, null),
   ];
 }
 

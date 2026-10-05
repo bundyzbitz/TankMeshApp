@@ -95,6 +95,16 @@ export default function SettingsScreen() {
               />
             </Field>
 
+            <Field label="Alerts" hint="Vibrate when any tank crosses its min/max threshold. Set thresholds per-tank in each sensor's edit page.">
+              <Switch
+                testID="alerts-switch"
+                value={state.settings.alertsEnabled}
+                onValueChange={(v) => tankStore.setAlertsEnabled(v)}
+                trackColor={{ true: '#FF5A5F', false: '#2A2A38' }}
+                thumbColor="#FFFFFF"
+              />
+            </Field>
+
             <Field label="BLE status">
               <Text style={styles.statusText} testID="ble-status-text">{statusLine}</Text>
             </Field>

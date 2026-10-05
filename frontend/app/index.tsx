@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -18,13 +19,16 @@ import { useTankStore, selectMatchingTanks, tankStore } from '@/src/store/tankSt
 import { batteryPercentFromMv, rgbHex } from '@/src/ble/protocol';
 import { Tank, TM_FLAG_LOW_BATT } from '@/src/types';
 import SignalBars from '@/src/components/SignalBars';
+import { TankGridCell } from '@/src/components/TankGridCell';
 
 export default function OverviewScreen() {
   const state = useTankStore();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
   const matching = useMemo(() => selectMatchingTanks(state), [state]);
   const otherSeen = state.tanks.length - matching.length;
+  const viewMode = state.settings.viewMode;
 
   const bleLabel =
     state.settings.demoMode ? 'DEMO MODE'
@@ -58,6 +62,18 @@ export default function OverviewScreen() {
           </View>
         </View>
         <Pressable
+          testID="view-mode-button"
+          onPress={() => tankStore.setViewMode(viewMode === 'list' ? 'grid' : 'list')}
+          hitSlop={12}
+          style={styles.iconBtn}
+        >
+          <Ionicons
+            name={viewMode === 'list' ? 'grid-outline' : 'list-outline'}
+            size={22}
+            color="#FFFFFF"
+          />
+        </Pressable>
+        <Pressable
           testID="settings-button"
           onPress={() => router.push('/settings')}
           hitSlop={12}
@@ -68,7 +84,7 @@ export default function OverviewScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32, paddingTop: 8 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32, paddingTop: viewMode === 'grid' ? 16 : 8, paddingHorizontal: viewMode === 'grid' ? 12 : 0 }}
         refreshControl={
           <RefreshControl
             refreshing={false}
@@ -81,6 +97,17 @@ export default function OverviewScreen() {
       >
         {matching.length === 0 ? (
           <EmptyState otherSeen={otherSeen} />
+        ) : viewMode === 'grid' ? (
+          <View style={styles.grid}>
+            {matching.map((t) => (
+              <TankGridCell
+                key={t.mac}
+                tank={t}
+                onPress={() => router.push(`/tank/${encodeURIComponent(t.mac)}`)}
+                width={(Math.min(screenW, 480) - 24 - 16) / 3}
+              />
+            ))}
+          </View>
         ) : (
           matching.map((t) => (
             <TankRow key={t.mac} tank={t} onPress={() => router.push(`/tank/${encodeURIComponent(t.mac)}`)} />
@@ -103,6 +130,10 @@ function TankRow({ tank, onPress }: { tank: Tank; onPress: () => void }) {
   const label = tank.name ? tank.name : `(${tank.mac.slice(-8)})`;
   const battPct = batteryPercentFromMv(tank.batteryMv);
   const lowBatt = (tank.flags & TM_FLAG_LOW_BATT) !== 0;
+  const alarm =
+    (tank.minThreshold != null && tank.levelPercent < tank.minThreshold) ? 'below'
+    : (tank.maxThreshold != null && tank.levelPercent > tank.maxThreshold) ? 'above'
+    : null;
 
   return (
     <Pressable
@@ -114,6 +145,21 @@ function TankRow({ tank, onPress }: { tank: Tank; onPress: () => void }) {
       <View style={styles.rowMain}>
         <View style={styles.rowTop}>
           <Text style={styles.rowName} numberOfLines={1} testID={`tank-name-${tank.mac}`}>{label}</Text>
+          {alarm && (
+            <View
+              testID={`alarm-pill-${tank.mac}`}
+              style={styles.alarmPill}
+            >
+              <Ionicons
+                name={alarm === 'below' ? 'arrow-down' : 'arrow-up'}
+                size={11}
+                color="#FFFFFF"
+              />
+              <Text style={styles.alarmText}>
+                {alarm === 'below' ? `< ${tank.minThreshold}%` : `> ${tank.maxThreshold}%`}
+              </Text>
+            </View>
+          )}
           <Text style={styles.rowPct} testID={`tank-pct-${tank.mac}`}>{tank.levelPercent}%</Text>
         </View>
         <View style={styles.barTrack}>
@@ -202,6 +248,23 @@ const styles = StyleSheet.create({
   rowBottom: { flexDirection: 'row', gap: 14, marginTop: 8, alignItems: 'center' },
   rowMeta: { color: '#6E6E76', fontSize: 11, letterSpacing: 0.4 },
   rssiBlock: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  alarmPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FF5A5F',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginRight: 8,
+  },
+  alarmText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
+
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
 
   hint: {
     color: '#F0B429',

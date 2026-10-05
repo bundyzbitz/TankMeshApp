@@ -2,6 +2,8 @@
 // and settings. Uses useSyncExternalStore for tearing-free reads.
 
 import { useSyncExternalStore } from 'react';
+import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
 import { TankMeshBle, TankMeshBleStatus, AdvEvent } from '../ble/tankMeshBle';
 import { makeMockTanks, tickMockTanks, appendAndPruneHistory } from '../ble/mockData';
 import {
@@ -10,6 +12,8 @@ import {
   saveSettings,
   getDisplayOrder,
   setDisplayOrder,
+  getThresholds,
+  setThresholds,
 } from './persist';
 import { AppSettings, Tank, MAX_TANKS, TankCal, TankMesh } from '../types';
 
@@ -73,7 +77,10 @@ class TankStore {
     let idx = list.findIndex((t) => t.mac === e.mac);
     if (idx < 0) {
       if (list.length >= MAX_TANKS) return;
-      const displayOrder = await getDisplayOrder(e.mac);
+      const [displayOrder, thresholds] = await Promise.all([
+        getDisplayOrder(e.mac),
+        getThresholds(e.mac),
+      ]);
       const now = Date.now();
       const fresh: Tank = {
         mac: e.mac,
@@ -88,6 +95,8 @@ class TankStore {
         lastSeenMs: now,
         rssi: e.rssi,
         displayOrder,
+        minThreshold: thresholds.min,
+        maxThreshold: thresholds.max,
         calMeshKnown: false,
         history: [{ t: now, level: e.adv.levelPercent }],
         // v2 adverts carry raw/filtered ADC inline — seed the diag block
@@ -141,11 +150,45 @@ class TankStore {
     };
     list[idx] = next;
     this.set({ tanks: list });
+    // Threshold edge detection — fire haptic only on *crossing* so a tank
+    // that stays below min doesn't keep buzzing every advert.
+    this.checkThresholdCrossing(cur, next);
     // If sensor bumped its settings version, re-pull
     if (next.advSettingsVersion !== next.cachedSettingsVersion) {
       this.pullSettings(next.mac);
     }
   };
+
+  private alertState = new Map<string, 'ok' | 'below' | 'above'>();
+
+  private checkThresholdCrossing(prev: Tank, next: Tank) {
+    if (!this.state.settings.alertsEnabled) return;
+    const classify = (t: Tank): 'ok' | 'below' | 'above' => {
+      if (t.minThreshold != null && t.levelPercent < t.minThreshold) return 'below';
+      if (t.maxThreshold != null && t.levelPercent > t.maxThreshold) return 'above';
+      return 'ok';
+    };
+    const was = this.alertState.get(next.mac) ?? classify(prev);
+    const now = classify(next);
+    this.alertState.set(next.mac, now);
+    // Only buzz on a transition into an alarm state (ok -> below/above),
+    // not on continued alarm or recovery.
+    if (now !== 'ok' && was !== now) {
+      this.fireAlert();
+    }
+  }
+
+  private fireAlert() {
+    if (Platform.OS === 'web') return;
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      // Two short follow-up pulses so it reads as "attention" not just a tap.
+      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 220);
+      setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium), 440);
+    } catch {
+      /* haptics not available on this device - ignore */
+    }
+  }
 
   private onStatus = (s: TankMeshBleStatus, msg?: string) => {
     this.set({ bleStatus: s, bleError: msg ?? null });
@@ -183,6 +226,25 @@ class TankStore {
   async setDisplayOrder(mac: string, order: number) {
     await setDisplayOrder(mac, order);
     this.updateTank(mac, (t) => ({ ...t, displayOrder: order }));
+  }
+
+  async setThresholds(mac: string, min: number | null, max: number | null) {
+    await setThresholds(mac, min, max);
+    this.updateTank(mac, (t) => ({ ...t, minThreshold: min, maxThreshold: max }));
+    // Reset edge state so the next out-of-range advert buzzes once.
+    this.alertState.delete(mac);
+  }
+
+  async setViewMode(mode: 'list' | 'grid') {
+    const s = { ...this.state.settings, viewMode: mode };
+    await saveSettings(s);
+    this.set({ settings: s });
+  }
+
+  async setAlertsEnabled(enabled: boolean) {
+    const s = { ...this.state.settings, alertsEnabled: enabled };
+    await saveSettings(s);
+    this.set({ settings: s });
   }
 
   async setScreenGroupLabel(group: string) {
