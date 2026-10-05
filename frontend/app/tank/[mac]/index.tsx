@@ -7,10 +7,13 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useWindowDimensions } from 'react-native';
 
 import { useTankStore } from '@/src/store/tankStore';
 import { batteryPercentFromMv, rgbHex } from '@/src/ble/protocol';
 import { TM_FLAG_LOW_BATT, TM_FLAG_CAL_VALID, TM_FLAG_ON_BATTERY } from '@/src/types';
+import LevelChart from '@/src/components/LevelChart';
+import SignalBars from '@/src/components/SignalBars';
 
 export default function TankDetailScreen() {
   const params = useLocalSearchParams<{ mac: string }>();
@@ -18,6 +21,7 @@ export default function TankDetailScreen() {
   const state = useTankStore();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
 
   const tank = useMemo(() => state.tanks.find((t) => t.mac === mac), [state.tanks, mac]);
 
@@ -105,10 +109,30 @@ export default function TankDetailScreen() {
             v={battPct >= 0 ? `${battPct}% (${tank.batteryMv} mV)` : 'Not measured'}
             valueColor={flagLow ? '#FF5A5F' : undefined}
           />
-          <MetaRow k="RSSI" v={tank.rssi != null ? `${tank.rssi} dBm` : '—'} />
+          <View style={styles.metaRow}>
+            <Text style={styles.metaK}>RSSI</Text>
+            {tank.rssi != null ? (
+              <View style={styles.rssiMetaBlock}>
+                <SignalBars rssi={tank.rssi} color={color} size={16} />
+                <Text style={styles.rssiText}>{tank.rssi} dBm</Text>
+              </View>
+            ) : (
+              <Text style={styles.metaV}>—</Text>
+            )}
+          </View>
           <MetaRow k="Wake interval" v={tank.mesh ? `${tank.mesh.sleepIntervalSec} s` : '—'} />
           <MetaRow k="Settings ver" v={String(tank.advSettingsVersion)} />
           <MetaRow k="Raw ADC" v={tank.diag ? `${tank.diag.rawAdc} (filt ${tank.diag.filteredAdc})` : '—'} />
+        </View>
+
+        <View style={styles.chartCard}>
+          <Text style={styles.chartTitle}>LEVEL HISTORY</Text>
+          <LevelChart
+            samples={tank.history}
+            color={color}
+            width={Math.min(screenW - 32, 420)}
+            height={140}
+          />
         </View>
       </ScrollView>
     </View>
@@ -244,6 +268,27 @@ const styles = StyleSheet.create({
   },
   metaK: { color: '#6E6E76', fontSize: 13 },
   metaV: { color: '#FFFFFF', fontSize: 13, fontWeight: '500', maxWidth: '60%', textAlign: 'right' },
+  rssiMetaBlock: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  rssiText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500' },
+
+  chartCard: {
+    marginTop: 20,
+    marginHorizontal: 16,
+    backgroundColor: '#12121C',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1E1E2A',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  chartTitle: {
+    color: '#6E6E76',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    marginLeft: 20,
+    marginBottom: 4,
+  },
 
   fab: {
     position: 'absolute',

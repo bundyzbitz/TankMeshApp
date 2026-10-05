@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTankStore, selectMatchingTanks, tankStore } from '@/src/store/tankStore';
 import { batteryPercentFromMv, rgbHex } from '@/src/ble/protocol';
 import { Tank, TM_FLAG_LOW_BATT } from '@/src/types';
+import SignalBars from '@/src/components/SignalBars';
 
 export default function OverviewScreen() {
   const state = useTankStore();
@@ -130,7 +131,12 @@ function TankRow({ tank, onPress }: { tank: Tank; onPress: () => void }) {
               Batt {battPct}%
             </Text>
           )}
-          {tank.rssi != null && <Text style={styles.rowMeta}>RSSI {tank.rssi}</Text>}
+          {tank.rssi != null && (
+            <View style={styles.rssiBlock} testID={`tank-rssi-${tank.mac}`}>
+              <SignalBars rssi={tank.rssi} color={color} size={14} />
+              <Text style={styles.rowMeta}>{tank.rssi} dBm</Text>
+            </View>
+          )}
         </View>
       </View>
     </Pressable>
@@ -193,8 +199,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   barFill: { height: '100%', borderRadius: 3 },
-  rowBottom: { flexDirection: 'row', gap: 14, marginTop: 8 },
+  rowBottom: { flexDirection: 'row', gap: 14, marginTop: 8, alignItems: 'center' },
   rowMeta: { color: '#6E6E76', fontSize: 11, letterSpacing: 0.4 },
+  rssiBlock: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   hint: {
     color: '#F0B429',

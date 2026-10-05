@@ -3,7 +3,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { TankMeshBle, TankMeshBleStatus, AdvEvent } from '../ble/tankMeshBle';
-import { makeMockTanks, tickMockTanks } from '../ble/mockData';
+import { makeMockTanks, tickMockTanks, appendAndPruneHistory } from '../ble/mockData';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -89,6 +89,7 @@ class TankStore {
         rssi: e.rssi,
         displayOrder,
         calMeshKnown: false,
+        history: [{ t: now, level: e.adv.levelPercent }],
         // v2 adverts carry raw/filtered ADC inline — seed the diag block
         // so the detail screen can show them before the GATT pull lands.
         diag: e.adv.rawAdc != null && e.adv.filteredAdc != null ? {
@@ -136,6 +137,7 @@ class TankStore {
       lastSeenMs: Date.now(),
       rssi: e.rssi,
       diag,
+      history: appendAndPruneHistory(cur.history, { t: Date.now(), level: e.adv.levelPercent }),
     };
     list[idx] = next;
     this.set({ tanks: list });

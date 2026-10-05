@@ -1,3 +1,8 @@
+export type LevelSample = {
+  t: number;     // epoch ms
+  level: number; // 0-100
+};
+
 export type Tank = {
   mac: string;                // "AA:BB:CC:DD:EE:FF"
   name: string;               // NUL-trimmed
@@ -16,6 +21,8 @@ export type Tank = {
   mesh?: TankMesh;
   diag?: TankDiag;
   calMeshKnown: boolean;
+  // Rolling level-% history (last ~1 h), appended on every advert
+  history: LevelSample[];
 };
 
 export type TankCal = {
