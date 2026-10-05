@@ -1,0 +1,45 @@
+L
+name: Build Android APK
+ 
+on:
+  workflow_dispatch:        # "Run workflow" button on the Actions tab
+  push:
+    branches: [main]        # also builds automatically on every push to main
+ 
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+ 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+ 
+      - name: Install JS dependencies
+        run: |
+          corepack enable
+          yarn install --non-interactive
+ 
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+ 
+      - name: Build release APK
+        working-directory: frontend/android
+        run: ./gradlew assembleRelease --no-daemon
+ 
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TankMesh-apk-${{ github.run_number }}
+          path: frontend/android/app/build/outputs/apk/release/*.apk
