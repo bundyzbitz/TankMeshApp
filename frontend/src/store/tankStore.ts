@@ -125,6 +125,10 @@ class TankStore {
       list.push(fresh);
       idx = list.length - 1;
       this.set({ tanks: list });
+      // Fire an alert immediately if this very first observation is already
+      // out of threshold — otherwise a tank that was low when the app opened
+      // would only alarm visually, never on the lock screen.
+      this.checkThresholdCrossing(fresh, fresh);
       // pull GATT settings (name, color, cal, mesh) once
       this.pullSettings(fresh.mac);
       return;
@@ -192,11 +196,13 @@ class TankStore {
       if (t.maxThreshold != null && t.levelPercent > t.maxThreshold) return 'above';
       return 'ok';
     };
-    const was = this.alertState.get(next.mac) ?? classify(prev);
+    // Treat the first-ever observation of a tank as a transition from
+    // "unknown" into whatever state it's in. That way a sensor already
+    // below its min when the app launches, or a threshold set on a
+    // tank that is already low, still buzzes.
+    const was = this.alertState.get(next.mac);
     const now = classify(next);
     this.alertState.set(next.mac, now);
-    // Only buzz on a transition into an alarm state (ok -> below/above),
-    // not on continued alarm or recovery.
     if (now !== 'ok' && was !== now) {
       this.fireAlert(next, now);
     }
