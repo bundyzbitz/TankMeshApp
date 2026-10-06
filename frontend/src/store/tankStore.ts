@@ -345,6 +345,31 @@ class TankStore {
     }
   }
 
+  // Debugging helper — fires one haptic + one lock-screen notification
+  // immediately so the user can confirm their phone is wired up correctly
+  // independent of any threshold logic.
+  async testAlert() {
+    if (Platform.OS !== 'web') {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      } catch { /* ignore */ }
+    }
+    const s = this.state.settings;
+    // If the user hasn't flipped the toggle yet, request permission inline
+    // so the test button also works as a smoke-test for the full flow.
+    if (!s.notificationsPermitted) {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        const next = { ...s, notificationsEnabled: true, notificationsPermitted: true };
+        await saveSettings(next);
+        this.set({ settings: next });
+      } else {
+        return;
+      }
+    }
+    await fireTankAlert('TankMesh test alert', 'If you can see this, lock-screen alerts are working.');
+  }
+
   async setDemoMode(demo: boolean) {
     const s = { ...this.state.settings, demoMode: demo };
     await saveSettings(s);

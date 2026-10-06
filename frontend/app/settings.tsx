@@ -183,6 +183,21 @@ export default function SettingsScreen() {
               />
             </Field>
 
+            <View style={styles.stackedField}>
+              <Text style={styles.stackedLabel}>Test alert</Text>
+              <Text style={styles.stackedHint}>
+                Fires one haptic + one lock-screen notification right now so you can confirm the plumbing works.
+              </Text>
+              <Pressable
+                testID="test-alert-button"
+                onPress={() => tankStore.testAlert()}
+                style={({ pressed }) => [styles.testAlertBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.testAlertText}>Send test alert</Text>
+              </Pressable>
+            </View>
+
             <Field label="BLE status">
               <Text style={styles.statusText} testID="ble-status-text">{statusLine}</Text>
             </Field>
@@ -375,6 +390,18 @@ const styles = StyleSheet.create({
   },
   groupBadgeTextActive: { color: '#0A0A14', fontSize: 10, fontWeight: '800' },
   groupBadgeTextInactive: { color: '#8E8E93', fontSize: 10, fontWeight: '700' },
+
+  testAlertBtn: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#FF5A5F',
+  },
+  testAlertText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   stackedField: {
     paddingVertical: 14,
     borderBottomWidth: 1,

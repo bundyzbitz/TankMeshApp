@@ -72,9 +72,13 @@ export async function fireTankAlert(
         body,
         sound: 'default',
         priority: 'high',
+        // Pin the notification to our HIGH-importance Android channel so
+        // it shows as a heads-up banner, plays a sound and wakes the
+        // screen. Omitting this quietly routes it to the "Default" channel
+        // which is low importance and often invisible.
+        ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL } : {}),
       },
       trigger: null, // fire immediately
-      ...(Platform.OS === 'android' ? { identifier: undefined } : {}),
     });
   } catch {
     /* notifications unavailable - ignore */
