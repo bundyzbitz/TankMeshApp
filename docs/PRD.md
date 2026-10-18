@@ -28,7 +28,7 @@ A React Native (Expo) mobile companion app that acts as a BLE central for the [B
 BLE native module cannot run in Expo Go or on the web preview. The app auto-detects this and enables **demo mode**, which cycles 4 mock tanks (Fresh Water, Grey Water, Black Water, Diesel) every 2 s so the UI can be reviewed before publishing an APK. Demo mode is also togglable from Settings.
 
 ## APK build
-BLE requires a native build. The user must use the Emergent **Publish** button (top-right) which runs EAS build and produces an APK. Expo Go will always fall back to demo mode.
+BLE requires a native build. Builds are produced by the GitHub Actions workflow (`.github/workflows/build-apk.yml`), triggered automatically on every push to `main` or manually from the Actions tab. Expo Go will always fall back to demo mode.
 
 ## Files of note
 - `src/ble/protocol.ts` — pack/unpack functions for the four characteristics + adv payload
