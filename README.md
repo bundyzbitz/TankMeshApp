@@ -23,7 +23,7 @@ Native Android (and iOS) companion app for [TankMesh](https://github.com/bundyzb
 
 ## Known limitations
 
-- **Background checks are ~15-minute granularity, not real-time.** This is an Android platform floor for periodic background work (`expo-background-fetch`/WorkManager), not a bug — fine for monitoring tanks that don't empty quickly, not suitable for anything needing second-by-second response.
+- **Background checks are ~15-minute granularity, not real-time.** This is an Android platform floor for periodic background work (`expo-background-task`), not a bug — fine for monitoring tanks that don't empty quickly, not suitable for anything needing second-by-second response.
 - **Aggressive OEM battery managers can still kill the background task even when correctly registered.** Chinese-OEM Android skins in particular (MIUI, ColorOS, FuntouchOS, OxygenOS, EMUI, and others) are known for killing background work that stock Android would allow. If alerts stop arriving reliably, check the phone's own battery-optimization settings and whitelist the app there — this is a widely-documented limitation of *any* Android app with background requirements, not specific to this one.
 - Background checks only cover sensors already known to the app (seen at least once while the app was open) and use whatever thresholds/group settings were last saved locally — they don't pull fresh GATT settings (name, calibration) from the sensor, only the broadcast advertisement (level, battery).
 - No cloud relay — if you want alerts to reach you when you're away from BLE range of the sensors entirely, that's out of scope for this architecture (would need a separate always-on gateway device posting to a server, a different project).
@@ -32,7 +32,7 @@ Native Android (and iOS) companion app for [TankMesh](https://github.com/bundyzb
 
 ```
 cd frontend
-npx expo install   # or: yarn install
+yarn install
 npx expo start
 ```
 
@@ -40,7 +40,7 @@ Needs a custom dev client or EAS build — `react-native-ble-plx` is a native mo
 
 ## Building a release APK
 
-Via the included GitHub Actions workflow (see the branch note above for which branch to run it from):
+Via the included GitHub Actions workflow — triggers automatically on every push to `main`, or manually:
 
 ```
 Actions tab → Build Android APK → Run workflow
