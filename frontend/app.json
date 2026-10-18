@@ -2,7 +2,7 @@
   "expo": {
     "name": "TankMesh",
     "slug": "frontend",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tankmesh",
@@ -30,7 +30,9 @@
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -52,8 +54,10 @@
       [
         "react-native-ble-plx",
         {
-          "isBackgroundEnabled": false,
-          "modes": ["central"],
+          "isBackgroundEnabled": true,
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "Scan nearby TankMesh sensors"
         }
       ],
@@ -70,7 +74,15 @@
         {
           "locationWhenInUsePermission": "Required by Android BLE scanning"
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#FF5A5F"
+        }
+      ],
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true

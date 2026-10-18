@@ -35,6 +35,12 @@ export default function TankSettingsScreen() {
   const [adcMax, setAdcMax] = useState(String(tank?.cal?.adcMax ?? 4095));
   const [group, setGroup] = useState(tank?.mesh?.prefix ?? 'TankMesh');
   const [sleep, setSleep] = useState(String(tank?.mesh?.sleepIntervalSec ?? 60));
+  const [minThresh, setMinThresh] = useState(
+    tank?.minThreshold != null ? String(tank.minThreshold) : '',
+  );
+  const [maxThresh, setMaxThresh] = useState(
+    tank?.maxThreshold != null ? String(tank.maxThreshold) : '',
+  );
   const [saving, setSaving] = useState(false);
   const [customHex, setCustomHex] = useState(rgbHex(tank?.colorRGB ?? 0x808080).slice(1));
   const [hydrated, setHydrated] = useState(false);
@@ -51,6 +57,8 @@ export default function TankSettingsScreen() {
       setAdcMax(String(tank.cal?.adcMax ?? 4095));
       setGroup(tank.mesh?.prefix ?? 'TankMesh');
       setSleep(String(tank.mesh?.sleepIntervalSec ?? 60));
+      setMinThresh(tank.minThreshold != null ? String(tank.minThreshold) : '');
+      setMaxThresh(tank.maxThreshold != null ? String(tank.maxThreshold) : '');
       setCustomHex(rgbHex(tank.colorRGB ?? 0x808080).slice(1));
       setHydrated(true);
     }
@@ -108,6 +116,13 @@ export default function TankSettingsScreen() {
       ) {
         await tankStore.writeMesh(mac, newMesh);
       }
+      // Alert thresholds — local-only, no BLE write
+      const parseThresh = (v: string): number | null => {
+        if (!v.trim()) return null;
+        const n = parseInt(v, 10);
+        return isNaN(n) ? null : Math.max(0, Math.min(100, n));
+      };
+      await tankStore.setThresholds(mac, parseThresh(minThresh), parseThresh(maxThresh));
       Alert.alert('Saved', 'Settings sent to sensor. May take one wake cycle to apply.');
     } catch (err: any) {
       Alert.alert(
@@ -244,6 +259,33 @@ export default function TankSettingsScreen() {
                 </Text>
               </View>
             )}
+          </Section>
+
+          <Section title="Alerts">
+            <Field label="Alert if below (%)" hint="Phone buzzes when the tank drops below this. Leave blank to disable.">
+              <TextInput
+                testID="minthresh-input"
+                value={minThresh}
+                onChangeText={(v) => setMinThresh(v.replace(/[^0-9]/g, '').slice(0, 3))}
+                keyboardType="number-pad"
+                placeholder="e.g. 20"
+                placeholderTextColor="#4A4A55"
+                style={styles.input}
+                maxLength={3}
+              />
+            </Field>
+            <Field label="Alert if above (%)" hint="Phone buzzes when the tank rises above this. Leave blank to disable.">
+              <TextInput
+                testID="maxthresh-input"
+                value={maxThresh}
+                onChangeText={(v) => setMaxThresh(v.replace(/[^0-9]/g, '').slice(0, 3))}
+                keyboardType="number-pad"
+                placeholder="e.g. 80"
+                placeholderTextColor="#4A4A55"
+                style={styles.input}
+                maxLength={3}
+              />
+            </Field>
           </Section>
 
           <Section title="Mesh">

@@ -15,13 +15,20 @@ import {
 export const b64ToBuf = (b64: string): Buffer => Buffer.from(b64, 'base64');
 export const bufToB64 = (buf: Buffer): string => buf.toString('base64');
 
-// ---- Advertisement (12-byte manufacturer payload after 2-byte company ID) ----
+// ---- Advertisement (12-byte v1 / 16-byte v2 manufacturer payload after
+// the 2-byte company ID). We accept any payload >= 12 bytes with the TM
+// magic, regardless of the protoVersion byte, so firmware revisions can
+// extend the layout without us dropping their adverts.
 export type ParsedAdv = {
+  protoVersion: number;
   levelPercent: number;
   batteryMv: number;
   counter: number;
   settingsVersion: number;
   flags: number;
+  // v2+ only — present when payload is at least 16 bytes long
+  rawAdc?: number;
+  filteredAdc?: number;
 };
 
 // input: the base64 payload from advertisement.manufacturerData
@@ -35,19 +42,27 @@ export function parseManufacturerAdv(b64: string): ParsedAdv | null {
   const magic0 = String.fromCharCode(buf.readUInt8(2));
   const magic1 = String.fromCharCode(buf.readUInt8(3));
   if (magic0 + magic1 !== TANKMESH_MAGIC) return null;
-  // protoVersion at byte 4 (unused today, still validated loosely)
+  const protoVersion = buf.readUInt8(4);
   const levelPercent = buf.readUInt8(5);
   const batteryMv    = buf.readUInt16LE(6);
   const counter      = buf.readUInt32LE(8);
   const settingsVer  = buf.readUInt8(12);
   const flags        = buf.readUInt8(13);
-  return {
+  const result: ParsedAdv = {
+    protoVersion,
     levelPercent: Math.max(0, Math.min(100, levelPercent)),
     batteryMv,
     counter,
     settingsVersion: settingsVer,
     flags,
   };
+  // v2 inlines rawAdc + filteredAdc at offsets 12/14 (payload offsets),
+  // which are 14/16 from the start of the manufacturer buffer.
+  if (protoVersion >= 2 && buf.length >= 2 + 16) {
+    result.rawAdc      = buf.readUInt16LE(14);
+    result.filteredAdc = buf.readUInt16LE(16);
+  }
+  return result;
 }
 
 // Some Android stacks strip the company ID and give only the payload;
@@ -60,13 +75,20 @@ export function tryParseAdvAnyFormat(b64: string): ParsedAdv | null {
   const magic0 = String.fromCharCode(buf.readUInt8(0));
   const magic1 = String.fromCharCode(buf.readUInt8(1));
   if (magic0 + magic1 !== TANKMESH_MAGIC) return null;
-  return {
+  const protoVersion = buf.readUInt8(2);
+  const result: ParsedAdv = {
+    protoVersion,
     levelPercent: buf.readUInt8(3),
     batteryMv: buf.readUInt16LE(4),
     counter: buf.readUInt32LE(6),
     settingsVersion: buf.readUInt8(10),
     flags: buf.readUInt8(11),
   };
+  if (protoVersion >= 2 && buf.length >= 16) {
+    result.rawAdc      = buf.readUInt16LE(12);
+    result.filteredAdc = buf.readUInt16LE(14);
+  }
+  return result;
 }
 
 // ---- NameColor characteristic (20 bytes) ----

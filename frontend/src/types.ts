@@ -1,3 +1,8 @@
+export type LevelSample = {
+  t: number;     // epoch ms
+  level: number; // 0-100
+};
+
 export type Tank = {
   mac: string;                // "AA:BB:CC:DD:EE:FF"
   name: string;               // NUL-trimmed
@@ -11,11 +16,15 @@ export type Tank = {
   lastSeenMs: number;
   rssi: number | null;
   displayOrder: number;       // 0..255, 255 = unset
+  minThreshold: number | null;  // alert when level drops below (0-100), null = disabled
+  maxThreshold: number | null;  // alert when level rises above (0-100), null = disabled
   // Cached GATT fields (fetched over connection)
   cal?: TankCal;
   mesh?: TankMesh;
   diag?: TankDiag;
   calMeshKnown: boolean;
+  // Rolling level-% history (last ~1 h), appended on every advert
+  history: LevelSample[];
 };
 
 export type TankCal = {
@@ -53,6 +62,15 @@ export const TANKMESH_MESH_UUID      = '8f9e1a03-4b2e-4f1a-9c3d-0123456789ab';
 export const TANKMESH_DIAG_UUID      = '8f9e1a04-4b2e-4f1a-9c3d-0123456789ab';
 
 export type AppSettings = {
-  screenGroupLabel: string;
+  // Legacy single-group label; kept for backward compat during migration.
+  screenGroupLabel?: string;
+  // Group labels this phone is monitoring. A tank shows on the overview
+  // iff its mesh.prefix is in this list. Supports monitoring multiple
+  // installs (e.g. Boat + RV) from one phone without re-labeling sensors.
+  visibleGroups: string[];
   demoMode: boolean;
+  viewMode: 'list' | 'grid';
+  alertsEnabled: boolean;
+  notificationsEnabled: boolean;   // whether the user wants lock-screen notifications
+  notificationsPermitted: boolean; // whether the OS has granted permission
 };
