@@ -6,13 +6,9 @@ Native Android (and iOS) companion app for [TankMesh](https://github.com/bundyzb
 
 ---
 
-## ⚠️ Branch note
+## Branch
 
-**`main` is behind this branch.** The notification/threshold feature (`expo-notifications`, `src/notifications/`, `src/background/`) only exists on `1.0.4` (and, in an earlier form, `1.0.2`). The GitHub Actions build workflow (`.github/workflows/build-apk.yml`) currently only exists on `main` and only triggers on pushes to `main` — so running it as-is right now would produce an APK **without** alerts at all.
-
-Before relying on CI to produce release builds, either:
-- merge `1.0.4` into `main` and keep developing there, or
-- move/copy the workflow onto `1.0.4` and point future development there instead.
+`main` is now the active development branch and includes everything from the former `1.0.4` branch, including the background notification feature. The `1.0.2` and `1.0.4` branches are retired — all further work happens on `main`, which is also what `.github/workflows/build-apk.yml` builds from.
 
 ---
 
